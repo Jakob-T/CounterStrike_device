@@ -4,9 +4,6 @@
 
 #define BUZZER_PIN 10
 
-#define TRIG_PIN 12
-#define ECHO_PIN 11
-
 #define RED_LED_PIN 13
 #define WHITE_LED_PIN A2
 
@@ -46,6 +43,7 @@ const unsigned long FINAL_TONE_TIME = 1200;
 
 // -------- SETUP --------
 void setup() {
+  Serial.begin(9600);
   pinMode(BUZZER_PIN, OUTPUT);
 
   lcd.init();
@@ -55,14 +53,11 @@ void setup() {
   lcd.setCursor(11, 0);
   lcd.print("         ");
 
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
-  digitalWrite(TRIG_PIN, LOW);
-
   pinMode(RED_LED_PIN, OUTPUT);
   digitalWrite(RED_LED_PIN, LOW);
   pinMode(WHITE_LED_PIN, OUTPUT);
   digitalWrite(WHITE_LED_PIN, LOW);
+  Serial.setTimeout(30);
 }
 
 //-------- BEEP FUNKCIJA --------
@@ -99,38 +94,37 @@ void resetSystem() {
   lcd.print("ENTER CODE:");
   lcd.setCursor(11, 0);
   lcd.print("         ");
+
+  Serial.println("RESET_DONE");
 }
 
-//-------- ULTRAZVUCNI SNEZOR --------
-int readDistanceCm() {
-  //na pocetku ga stavis na low da ga ocistis
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
+void handleSerial() {
+  if (!Serial.available()) return;
+  String cmd = Serial.readStringUntil('\n');
+  cmd.trim();
 
-  // echo pulse sirina (timeout je 25ms jer to je otp 4m udaljenosti)
-  unsigned long duration = pulseIn(ECHO_PIN, HIGH, 25000UL);
+  if (cmd == "ARM" && !bombArmed && !exploded) {
+    bombArmed = true;
+    Serial.println("ARMED serial");
+    exploded = false;
+    armTime = millis();
+    inputCode = "";
 
-  if (duration == 0) return -1; // ak nema očitanja (out of range / no echo)
+    lcd.clear();
+    lcd.setCursor(1, 1);
+    lcd.print(">>> BOMB ARMED <<<");
+    return;
+  }
 
-  // brzina zvuka ~343 m/s => 29.1 us/cm za roundtrip, /2 za one-way
-  int cm = (int)(duration / 58UL);
-  return cm;
+  if (cmd == "RESET") {
+    resetSystem();
+    return;
+  }
 }
 
 void loop() {
+  handleSerial();
   char key = keypad.getKey();
-
-  //sonar refresh (svakih 150ms)
-  static unsigned long lastSonar = 0;
-  static int cm = -1;
-
-  if (millis() - lastSonar >= 150) {
-    lastSonar = millis();
-    cm = readDistanceCm();
-  }
 
   //resetiranje nakon eksplozije
   if (exploded && key == '*') {
@@ -154,19 +148,10 @@ void loop() {
     lcd.setCursor(11, 0);
     lcd.print(inputCode);
 
-    //prikaz distance u idle
-    lcd.setCursor(0, 2);
-    lcd.print("DIST: ");
-    if (cm < 0) lcd.print("---");
-    else lcd.print(cm);
-    lcd.print("cm   ");
-
-    //auto-arm na blizinu
-    bool nearTrigger = (cm > 0 && cm <= 10);
-
     //armanje na # (kodom) ili auto-arm na blizinu
-    if ((key == '#' && inputCode == correctCode) || nearTrigger) {
+    if ((key == '#' && inputCode == correctCode)) {
       bombArmed = true;
+      Serial.println("ARMED keypad");
       armTime = millis();
       exploded = false;
 
@@ -193,6 +178,7 @@ void loop() {
 
     if (elapsed >= BOMB_TIME) {
       exploded = true;
+      Serial.println("BOOM");
       noTone(BUZZER_PIN);
       lcd.clear();
       lcd.setCursor(2, 1);
