@@ -162,7 +162,7 @@ Input Devices
 
 Output & Feedback
 
-- LCD Screen – system status display
+- I2C LCD display – system status display
 
 - Piezo Buzzer – audio feedback and alarm signaling
 
