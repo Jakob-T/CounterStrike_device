@@ -1,0 +1,4 @@
+paho-mqtt>=1.6.1
+tornado>=6.3
+pyserial>=3.5
+pymysql>=1.1.0
