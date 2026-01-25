@@ -32,6 +32,7 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 // -------- VARIJABLE --------
 String inputCode = "";
 String correctCode = "7355608";
+String lastShownCode = "";
 
 bool bombArmed = false;
 bool exploded = false;
@@ -80,6 +81,7 @@ void resetSystem() {
   bombArmed = false;
   exploded = false;
   inputCode = "";
+  lastShownCode = "";
   armTime = 0;
   lastBeep = 0;
   redOffAt = 0;
@@ -109,6 +111,7 @@ void handleSerial() {
     exploded = false;
     armTime = millis();
     inputCode = "";
+    lastShownCode = "";
 
     lcd.clear();
     lcd.setCursor(1, 1);
@@ -139,14 +142,22 @@ void loop() {
         if (inputCode.length() < 10) inputCode += key;
       }
 
-      if (key == '*') inputCode = "";
+      if (key == '*'){
+        inputCode = "";
+        lastShownCode = "";
+      }
     }
 
     //prikaz unosa
-    lcd.setCursor(11, 0);
-    lcd.print("         ");
-    lcd.setCursor(11, 0);
-    lcd.print(inputCode);
+    if (inputCode != lastShownCode) {
+      lcd.setCursor(11, 0);
+      String padded = inputCode;
+      while (padded.length() < 9) padded += ' ';
+      if (padded.length() > 9) padded = padded.substring(0, 9);
+
+      lcd.print(padded);
+      lastShownCode = inputCode;
+    }
 
     //armanje na # (kodom) ili auto-arm na blizinu
     if ((key == '#' && inputCode == correctCode)) {
@@ -159,6 +170,7 @@ void loop() {
       lcd.setCursor(1, 1);
       lcd.print(">>> BOMB ARMED <<<");
       inputCode = "";
+      lastShownCode = "";
       lcd.setCursor(0, 2);
       lcd.print("                    ");
     } else if (key == '#') {//krivi kod

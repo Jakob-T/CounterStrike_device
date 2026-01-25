@@ -15,6 +15,10 @@ const int ECHO_PIN = 5;
 const int TRIGGER_CM = 10;
 const unsigned long COOLDOWN_MS = 5000;
 
+const int STABLE_HITS = 3;
+int stableCount = 0;
+int lastStableCm = -1;
+
 WiFiClient wifiClient;
 PubSubClient mqtt(wifiClient);
 
@@ -81,14 +85,24 @@ void loop() {
   int cm = readDistanceCmFiltered();
 
   if (cm > 0 && cm <= TRIGGER_CM) {
-    unsigned long now = millis();
-    if (now - lastTrigger > COOLDOWN_MS) {
-      lastTrigger = now;
-      char payload[8];
-      snprintf(payload, sizeof(payload), "%d", cm);
-      mqtt.publish(TOPIC_ARM, payload);
-    }
+    stableCount++;
+    lastStableCm = cm;
+  } else {
+    stableCount = 0;
+    lastStableCm = -1;
   }
 
+  unsigned long now = millis();
+  if (stableCount >= STABLE_HITS && (now - lastTrigger > COOLDOWN_MS)) {
+    lastTrigger = now;
+    stableCount = 0;
+
+    char payload[8];
+    snprintf(payload, sizeof(payload), "%d", lastStableCm);
+    mqtt.publish(TOPIC_ARM, payload);
+
+    lastStableCm = -1;
+  }
+  
   delay(100);
 }
